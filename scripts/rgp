@@ -1,0 +1,6 @@
+#!/usr/bin/env -S bash
+
+# Wraps ripgrep with https://github.com/dandavison/delta
+# for syntax highlighting 
+
+rg --json "$@" <&0 | delta
