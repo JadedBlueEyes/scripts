@@ -1,0 +1,5 @@
+#!/usr/bin/env -S bash
+
+# Strips ANSI from the input 
+
+rg --passthru -N "\x1b\[[0-9;]*[mK]" -r "" <&0
