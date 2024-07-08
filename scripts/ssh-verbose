@@ -1,0 +1,6 @@
+#!/usr/bin/env -S bash
+
+# Invokes SSH with verbose logging. Useful for debugging issues with, for example, git push:
+#  GIT_SSH=ssh-verbose git push origin -vvv
+
+ssh -vvv "$@" <&0
