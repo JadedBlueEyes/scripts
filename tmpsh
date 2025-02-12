@@ -1,0 +1,19 @@
+#!/usr/bin/env -S bash
+
+tmp() {
+  history -w || true
+  t=$(mktemp --tmpdir -d tmpdir-XXXXXX) \
+    && { $SHELL -c \
+     "cd '$t' \
+      && printf '\033[31m%s\033[0m\n' 'this directory will be removed upon exit' \
+      && pwd \
+      && exec $SHELL" \
+     || true; \
+    } \
+    && if awk '{ print $2 }' /etc/mtab | grep "$t"; then
+      echo -e "\033[31maborting removal due to mounts\033[0m" >&2
+    else
+      echo -e "\033[31mremoving temporary directory ...\033[0m" >&2
+      rm -rf "$t"
+    fi
+}
