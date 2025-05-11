@@ -7,8 +7,11 @@ def get-redactable-events [
     sender_pattern: string,
     db_path: string = '~/Library/Application Support/gomuks/gomuks.db'
 ] {
-    sqlite3 -json ($db_path | path expand) $"select event_id, room_id from event where room_id in \(\"($room_ids | str join '","')\") and sender like '($sender_pattern)' and content != '{}' and type = 'm.room.message' and event_id NOT IN \(SELECT json_extract\(content, '$.redacts') FROM event WHERE type = 'm.room.redaction' AND room_id = event.room_id);"
-    | from json
+    open ($db_path | path expand) | query db "
+    select event_id, room_id 
+    from event 
+    where room_id in (SELECT value FROM json_each(:room_ids)) and sender like :sender_pattern and content != '{}' and type = 'm.room.message' and event_id NOT IN \(SELECT json_extract\(content, '$.redacts') FROM event WHERE type = 'm.room.redaction' AND room_id = event.room_id)
+    " -p { room_ids: ($room_ids | to json), sender_pattern: $sender_pattern }
 }
 
 
@@ -29,4 +32,4 @@ def redact-all-events [
 # Execute the redaction process
 # redact-all-events $env.MATRIX_HOME_SERVER $env.MATRIX_ACCESS_TOKEN ["!main-1:continuwuity.org"]
 
-# get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "@%:funchatelement.bingbingwu.buzz"
+get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "@%:ellis.link"
