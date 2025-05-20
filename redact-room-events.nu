@@ -4,14 +4,15 @@
 # Query the database for events that need to be redacted
 def get-redactable-events [
     room_ids: list<string>,
-    sender_pattern: string,
+    filter: string,
+    params?: record,
     db_path: string = '~/Library/Application Support/gomuks/gomuks.db'
 ] {
-    open ($db_path | path expand) | query db "
+    open ($db_path | path expand) | query db ("
     select event_id, room_id
     from event
     where room_id in (SELECT value FROM json_each(:room_ids))
-    and sender like :sender_pattern and content != '{}'
+    and " + $filter + " and content != '{}'
     and type = 'm.room.message'
     AND NOT EXISTS (
         SELECT 1
@@ -20,7 +21,7 @@ def get-redactable-events [
         AND json_extract(r.content, '$.redacts') = event.event_id
         AND r.room_id = event.room_id
     )
-    " -p { room_ids: ($room_ids | to json), sender_pattern: $sender_pattern }
+    ") -p ($params | merge { room_ids: ($room_ids | to json) })
 }
 
 
@@ -29,9 +30,9 @@ def redact-all-events [
     homeserver: string,
     access_token: string,
     room_ids: list<string>,
-    sender_pattern: string
+    filter: string
 ] {
-    get-redactable-events $room_ids $sender_pattern
+    get-redactable-events $room_ids $filter
     | each { |row|
         ./scripts/matrix.nu redact $homeserver $access_token $row.room_id $row.event_id 'spam'
     }
@@ -64,11 +65,26 @@ def filter-unredacted-events [
 # Execute the redaction process
 # redact-all-events $env.MATRIX_HOME_SERVER $env.MATRIX_ACCESS_TOKEN ["!main-1:continuwuity.org"]
 
-# get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "@%:ellis.link"
+# get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] 'sender like "@%:ellis.link"'
 
 # filter-unredacted-events ["$7r8YNKrZ9rs8I_Qy5b1XFSknhSBMZ5fVoCjYjODqjYM", "$sPcEOoUTtz4S0vdaBJNMVnSBSfEmtljcKxFj4KWBo_4"] "!main-1:continuwuity.org"
 
 
-get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "@%:matrix.sucroid.com" | each { |row|
-    ./scripts/matrix.nu redact $env.MATRIX_HOME_SERVER $env.MATRIX_ACCESS_TOKEN $row.room_id $row.event_id 'spam'
+# Get a list of users who joined a room after a specific timestamp
+def get-room-members-after-timestamp [
+    homeserver: string,      # Matrix homeserver URL
+    access_token: string,    # Matrix access token
+    room_id: string,         # Room ID to check
+    timestamp: int,           # Unix timestamp in milliseconds
+    membership: string,       # Membership status to filter by
+] {
+    http get $"($homeserver)/_matrix/client/v3/rooms/($room_id)/state" --headers {Authorization: $"Bearer ($access_token)"} |
+      where type == "m.room.member" and origin_server_ts >= $timestamp and content.membership == $membership |
+      get state_key
 }
+
+get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "sender in (SELECT value FROM json_each(:banned_users))" { banned_users: (get-room-members-after-timestamp $env.MATRIX_HOME_SERVER $env.MATRIX_ACCESS_TOKEN "!main-1:continuwuity.org" ((((date now) - 20min) | into int) // 1000000) "ban" | to json)}
+
+# get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "@%:matrix.sucroid.com" | each { |row|
+#     ./scripts/matrix.nu redact $env.MATRIX_HOME_SERVER $env.MATRIX_ACCESS_TOKEN $row.room_id $row.event_id 'spam'
+# }
