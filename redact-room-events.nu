@@ -66,4 +66,9 @@ def filter-unredacted-events [
 
 # get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "@%:ellis.link"
 
-filter-unredacted-events ["$7r8YNKrZ9rs8I_Qy5b1XFSknhSBMZ5fVoCjYjODqjYM", "$sPcEOoUTtz4S0vdaBJNMVnSBSfEmtljcKxFj4KWBo_4"] "!main-1:continuwuity.org"
+# filter-unredacted-events ["$7r8YNKrZ9rs8I_Qy5b1XFSknhSBMZ5fVoCjYjODqjYM", "$sPcEOoUTtz4S0vdaBJNMVnSBSfEmtljcKxFj4KWBo_4"] "!main-1:continuwuity.org"
+
+
+get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "@%:matrix.sucroid.com" | each { |row|
+    ./scripts/matrix.nu redact $env.MATRIX_HOME_SERVER $env.MATRIX_ACCESS_TOKEN $row.room_id $row.event_id 'spam'
+}
