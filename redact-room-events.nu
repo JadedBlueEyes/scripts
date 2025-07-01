@@ -9,7 +9,7 @@ def get-redactable-events [
     db_path: string = '~/Library/Application Support/gomuks/gomuks.db'
 ] {
     open ($db_path | path expand) | query db ("
-    select event_id, room_id
+    select event_id, room_id, content
     from event
     where room_id in (SELECT value FROM json_each(:room_ids))
     and " + $filter + " and content != '{}'
@@ -83,8 +83,11 @@ def get-room-members-after-timestamp [
       get state_key
 }
 
-get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "sender in (SELECT value FROM json_each(:banned_users))" { banned_users: (get-room-members-after-timestamp $env.MATRIX_HOME_SERVER $env.MATRIX_ACCESS_TOKEN "!main-1:continuwuity.org" ((((date now) - 20min) | into int) // 1000000) "ban" | to json)}
+# get-redactable-events ["!CHHeCdeLwEtmDAOcZg:fachschaften.org", ] "sender in (SELECT value FROM json_each(:banned_users))" { banned_users: (get-room-members-after-timestamp $env.MATRIX_HOME_SERVER $env.MATRIX_ACCESS_TOKEN "!CHHeCdeLwEtmDAOcZg:fachschaften.org" ((((date now) - 4hr) | into int) // 1000000) "ban" | to json)} | get event_id| str join "\n"
 
 # get-redactable-events ["!main-1:continuwuity.org", "!offtopic-1:continuwuity.org", ] "@%:matrix.sucroid.com" | each { |row|
 #     ./scripts/matrix.nu redact $env.MATRIX_HOME_SERVER $env.MATRIX_ACCESS_TOKEN $row.room_id $row.event_id 'spam'
 # }
+
+get-redactable-events ["!GNPBRmjZKKEGszhMtB:matrix.org", ] "json_extract(content, '$.body') LIKE '%'" {} | get event_id| str join "\n" | save events.txt
+# get-redactable-events ["!GNPBRmjZKKEGszhMtB:matrix.org", ] "json_extract(content, '$.body') LIKE '%'" {}
