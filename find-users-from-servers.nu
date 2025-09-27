@@ -16,19 +16,21 @@ def find-users-from-servers-multi-room [
     db_path: string = '~/Library/Application Support/gomuks/gomuks.db' # Path to the gomuks database
 ] {
     # Build the SQL condition for server matching
-    let server_conditions = $servers | each { |server| $"state_key LIKE '%:($server)'" } | str join " OR "
+    let server_conditions = $servers | each { |server| $"current_state.state_key LIKE '%:($server)'" } | str join " OR "
 
     # Query the database for current room members from the specified servers
     open ($db_path | path expand) | query db $"
-        SELECT DISTINCT room_id, state_key as user_id, membership
-        FROM current_state WHERE
-        room_id IN \(SELECT value FROM json_each\(:room_ids)) AND
+        SELECT DISTINCT current_state.room_id, current_state.state_key as user_id, event.content
+        FROM current_state JOIN event ON current_state.event_rowid = event.rowid WHERE
+        current_state.room_id IN \(SELECT value FROM json_each\(:room_ids)) AND
         event_type = 'm.room.member'
         AND \(($server_conditions)\)
-        ORDER BY room_id, state_key
+        ORDER BY current_state.room_id, current_state.state_key
     " -p { room_ids: ($room_ids | to json) } | insert server { |row|
         $row.user_id | str replace --regex '^.*:(.*)$' '${1}'
-    }
+    } | insert content_parsed { |row|
+        $row.content | from json
+    } | reject content
 }
 def find-users-from-all-servers [
     servers: list<string>,              # List of server domains to find users from
