@@ -56,14 +56,15 @@ def jade-rooms-servers [
         $acc | insert $row.server $row.room_count
     })
 
-    # First get all of jade's rooms
+    # First get all of jade's rooms with room metadata
     let jade_rooms = (open ($db_path | path expand) | query db "
-        SELECT DISTINCT room_id
-        FROM current_state
-        WHERE state_key = :jade_user
-        AND event_type = 'm.room.member'
-        AND membership = 'join'
-        ORDER BY room_id
+        SELECT DISTINCT cs.room_id, r.name, r.topic, r.avatar, r.canonical_alias, r.sorting_timestamp
+        FROM current_state cs
+        LEFT JOIN room r ON cs.room_id = r.room_id
+        WHERE cs.state_key = :jade_user
+        AND cs.event_type = 'm.room.member'
+        AND cs.membership = 'join'
+        ORDER BY cs.room_id
     " -p { jade_user: $jade_user })
 
     # Get all room-server combinations for jade's rooms in one query
@@ -107,6 +108,11 @@ def jade-rooms-servers [
 
         {
             room_id: $room_id,
+            name: $room_row.name,
+            topic: $room_row.topic,
+            avatar: $room_row.avatar,
+            canonical_alias: $room_row.canonical_alias,
+            sorting_timestamp: $room_row.sorting_timestamp,
             servers: $servers
         }
     }
